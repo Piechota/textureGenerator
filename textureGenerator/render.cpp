@@ -46,14 +46,14 @@ void CRender::Init()
 
 	CheckResult(m_device->CreateDescriptorHeap(&renderTargetHeapDesc, IID_PPV_ARGS(&m_renderTargetHeap)));
 
-	D3D12_HEAP_PROPERTIES renderTargetHeapProp =
+	D3D12_HEAP_PROPERTIES const renderTargetHeapProp =
 	{
 		D3D12_HEAP_TYPE_CUSTOM,
-		D3D12_CPU_PAGE_PROPERTY_NOT_AVAILABLE,
-		D3D12_MEMORY_POOL_L1,
+		D3D12_CPU_PAGE_PROPERTY_WRITE_BACK,
+		D3D12_MEMORY_POOL_L0,
 		0, 0
 	};
-	D3D12_RESOURCE_DESC renderTargetResDesc = 
+	D3D12_RESOURCE_DESC const renderTargetResDesc = 
 	{
 		D3D12_RESOURCE_DIMENSION_TEXTURE2D,
 		0,
@@ -66,7 +66,7 @@ void CRender::Init()
 		D3D12_TEXTURE_LAYOUT_UNKNOWN,
 		D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET
 	};
-	CheckResult(m_device->CreateCommittedResource(&renderTargetHeapProp, D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES, &renderTargetResDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, nullptr, IID_PPV_ARGS(&m_renderTargetRes)));
+	CheckResult(m_device->CreateCommittedResource(&renderTargetHeapProp, D3D12_HEAP_FLAG_NONE, &renderTargetResDesc, D3D12_RESOURCE_STATE_RENDER_TARGET | D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_renderTargetRes)));
 	m_device->CreateRenderTargetView(m_renderTargetRes, nullptr, m_renderTargetHeap->GetCPUDescriptorHandleForHeapStart());
 }
 
