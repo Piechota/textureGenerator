@@ -3,11 +3,15 @@
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QMainWindow>
 
+#include "render.h"
+
 QApplication* GApplication = nullptr;
 QMainWindow* GMainWindow = nullptr;
 
 int main(int argc, char* argv[])
 {
+	GRender.Init();
+
 	GApplication = new QApplication(argc, argv);
 
 	GMainWindow = new QMainWindow();
@@ -15,5 +19,9 @@ int main(int argc, char* argv[])
 
 	GMainWindow->show();
 
-	return GApplication->exec();
+	int const retValue = GApplication->exec();
+
+	GRender.Release();
+
+	return retValue;
 }

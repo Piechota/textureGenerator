@@ -124,10 +124,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="render.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="globals.h" />
     <ClInclude Include="moc_widgetCodeInput.h" />
+    <ClInclude Include="render.h" />
     <CustomBuild Include="widgetCodeInput.h">
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)moc.exe %(FullPath) -o  $(ProjectDir)moc_%(Identity)</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating moc file for %(Identity)</Message>
