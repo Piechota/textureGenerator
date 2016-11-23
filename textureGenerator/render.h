@@ -19,18 +19,17 @@ private:
 	ID3D12GraphicsCommandList* m_textureCL;
 	ID3D12CommandAllocator*	m_textureCA;
 	ID3D12CommandQueue* m_textureCQ;
-	ID3D12GraphicsCommandList* m_copyCL;
-	ID3D12CommandAllocator*	m_copyCA;
-	ID3D12CommandQueue* m_copyCQ;
 	ID3D12RootSignature* m_rootSignature;
 	ID3D12PipelineState* m_texturePSO;
 
 	ID3D12DescriptorHeap* m_renderTargetHeap;
 	ID3D12Resource* m_renderTargetRes;
-	ID3D12Resource* m_cpuAccessRes;
 
 	D3D12_PLACED_SUBRESOURCE_FOOTPRINT m_renderTargetFootprint;
-
+	UINT64 m_bufferSize;
+	UINT m_numRows;
+	UINT64 m_rowSize;
+	
 	UINT m_fenceValue;
 	HANDLE m_fenceEvent;
 

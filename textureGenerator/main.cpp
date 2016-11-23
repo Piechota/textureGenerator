@@ -14,6 +14,7 @@ int main(int argc, char* argv[])
 
 	GRender.GenerateImage();
 	BYTE* texData = (BYTE*)GRender.GetRenderTargetData();
+
 	GApplication = new QApplication(argc, argv);
 
 	GMainWindow = new QMainWindow();

@@ -30,7 +30,7 @@ char const* psShader =
 "};"
 "float4 psMain(PSInput input) : SV_TARGET"
 "{"
-"	return float4(input.uv, 0.f, 0.f);"
+"	return float4(1.f, 0.f, 1.f, 0.f);"
 "}";
 
 void CheckResult(HRESULT result)
@@ -67,13 +67,13 @@ void CRender::Init()
 
 	m_viewport.MaxDepth = 1.f;
 	m_viewport.MinDepth = 0.f;
-	m_viewport.Width = 600.f;
-	m_viewport.Height = 600.f;
+	m_viewport.Width = 32.f;
+	m_viewport.Height = 32.f;
 	m_viewport.TopLeftX = 0.f;
 	m_viewport.TopLeftY = 0.f;
 
-	m_scissorRect.right = 600;
-	m_scissorRect.bottom = 600;
+	m_scissorRect.right = 32;
+	m_scissorRect.bottom = 32;
 	m_scissorRect.left = 0;
 	m_scissorRect.top = 0;
 
@@ -93,14 +93,7 @@ void CRender::Init()
 	CheckResult(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_textureCQ)));
 	CheckResult(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_textureCA)));
 	CheckResult(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_textureCA, nullptr, IID_PPV_ARGS(&m_textureCL)));
-
-	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_COPY;
-	CheckResult(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_copyCQ)));
-	CheckResult(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY, IID_PPV_ARGS(&m_copyCA)));
-	CheckResult(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COPY, m_copyCA, nullptr, IID_PPV_ARGS(&m_copyCL)));
-
 	m_textureCL->Close();
-	m_copyCL->Close();
 
 	D3D12_DESCRIPTOR_HEAP_DESC renderTargetHeapDesc = {};
 	renderTargetHeapDesc.NumDescriptors = 1;
@@ -119,8 +112,8 @@ void CRender::Init()
 	{
 		D3D12_RESOURCE_DIMENSION_TEXTURE2D,
 		0,
-		600,
-		600,
+		32,
+		32,
 		1,
 		1,
 		DXGI_FORMAT_R8G8B8A8_UNORM,
@@ -129,35 +122,13 @@ void CRender::Init()
 		D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET
 	};
 
-	CheckResult(m_device->CreateCommittedResource(&renderTargetHeapProp, D3D12_HEAP_FLAG_NONE, &renderTargetResDesc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_renderTargetRes)));
+	CheckResult(m_device->CreateCommittedResource(&renderTargetHeapProp, D3D12_HEAP_FLAG_NONE, &renderTargetResDesc, D3D12_RESOURCE_STATE_RENDER_TARGET | D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_renderTargetRes)));
 	m_device->CreateRenderTargetView(m_renderTargetRes, nullptr, m_renderTargetHeap->GetCPUDescriptorHandleForHeapStart());
 
-	UINT64 bufferSize;
-	UINT numRows;
-	UINT64 rowSize;
-	m_device->GetCopyableFootprints(&renderTargetResDesc, 0, 1, 0, &m_renderTargetFootprint, &numRows, &rowSize, &bufferSize);
+	
+	m_device->GetCopyableFootprints(&renderTargetResDesc, 0, 1, 0, &m_renderTargetFootprint, &m_numRows, &m_rowSize, &m_bufferSize);
 
-	D3D12_HEAP_PROPERTIES const cpuAccessHeapProp =
-	{
-		D3D12_HEAP_TYPE_READBACK,
-		D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
-		D3D12_MEMORY_POOL_UNKNOWN,
-		0, 0
-	};
-	D3D12_RESOURCE_DESC const cpuAccessResDesc =
-	{
-		D3D12_RESOURCE_DIMENSION_BUFFER,
-		0,
-		bufferSize,
-		1,
-		1,
-		1,
-		DXGI_FORMAT_UNKNOWN,
-		{ 1, 0 },
-		D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
-		D3D12_RESOURCE_FLAG_NONE
-	};
-	CheckResult(m_device->CreateCommittedResource(&cpuAccessHeapProp, D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES, &cpuAccessResDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_cpuAccessRes)));
+	m_renderTargetData = new BYTE[m_bufferSize];
 
 	ID3DBlob* rootSignatureBlob = nullptr;
 	ID3DBlob* errorBlob = nullptr;
@@ -200,8 +171,6 @@ void CRender::Init()
 
 void CRender::Release()
 {
-	m_cpuAccessRes->Unmap(0, nullptr);
-	m_cpuAccessRes->Release();
 	m_renderTargetRes->Release();
 	m_renderTargetHeap->Release();
 	m_texturePSO->Release();
@@ -209,11 +178,10 @@ void CRender::Release()
 	m_textureCL->Release();
 	m_textureCA->Release();
 	m_textureCQ->Release();
-	m_copyCL->Release();
-	m_copyCA->Release();
-	m_copyCQ->Release();
 	m_fence->Release();
 	m_device->Release();
+
+	delete[] m_renderTargetData;
 
 #ifdef _DEBUG
 	m_debugController->Release();
@@ -222,65 +190,26 @@ void CRender::Release()
 
 void CRender::GenerateImage()
 {
-	D3D12_RESOURCE_BARRIER renderTargetBarrier = {};
-	renderTargetBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	renderTargetBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	renderTargetBarrier.Transition.pResource = m_renderTargetRes;
-	renderTargetBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
-	renderTargetBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-	renderTargetBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-
 	m_textureCA->Reset();
 	m_textureCL->Reset(m_textureCA, m_texturePSO);
-	m_textureCL->ResourceBarrier(1, &renderTargetBarrier);
 	m_textureCL->OMSetRenderTargets(1, &m_renderTargetHeap->GetCPUDescriptorHandleForHeapStart(), true, nullptr);
 	m_textureCL->RSSetViewports(1, &m_viewport);
 	m_textureCL->RSSetScissorRects(1, &m_scissorRect);
 	m_textureCL->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	m_textureCL->SetGraphicsRootSignature(m_rootSignature);
 	m_textureCL->DrawInstanced(3, 1, 0, 0);
-
-	renderTargetBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COMMON;
-	renderTargetBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-	m_textureCL->ResourceBarrier(1, &renderTargetBarrier);
-
 	m_textureCL->Close();
-
 	m_textureCQ->ExecuteCommandLists(1, (ID3D12CommandList**)&m_textureCL);
-
-	m_copyCA->Reset();
-	m_copyCL->Reset(m_copyCA, nullptr);
-
-	D3D12_TEXTURE_COPY_LOCATION dst;
-	dst.pResource = m_cpuAccessRes;
-	dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-	dst.PlacedFootprint = m_renderTargetFootprint;
-
-	D3D12_TEXTURE_COPY_LOCATION src;
-	src.pResource = m_renderTargetRes;
-	src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-	src.SubresourceIndex = 0;
-
-	m_copyCL->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
-	m_copyCL->Close();
 
 	CheckResult(m_textureCQ->Signal(m_fence, m_fenceValue));
 	CheckResult(m_fence->SetEventOnCompletion(m_fenceValue, m_fenceEvent));
 	++m_fenceValue;
 	WaitForSingleObject(m_fenceEvent, INFINITE);
-
-	m_copyCQ->ExecuteCommandLists(1, (ID3D12CommandList**)&m_copyCL);
-
-	CheckResult(m_copyCQ->Signal(m_fence, m_fenceValue));
-	CheckResult(m_fence->SetEventOnCompletion(m_fenceValue, m_fenceEvent));
-	++m_fenceValue;
-	WaitForSingleObject(m_fenceEvent, INFINITE);
-
-	CheckResult(m_cpuAccessRes->Map(0, nullptr, (void**)&m_renderTargetData));
 }
 
 void* CRender::GetRenderTargetData()
 {
+	CheckResult(m_renderTargetRes->ReadFromSubresource((void*)m_renderTargetData, m_renderTargetFootprint.Footprint.RowPitch, m_bufferSize, 0, nullptr));
 	return m_renderTargetData;
 }
 
