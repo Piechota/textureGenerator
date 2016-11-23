@@ -30,7 +30,7 @@ char const* psShader =
 "};"
 "float4 psMain(PSInput input) : SV_TARGET"
 "{"
-"	return float4(1.f, 1.f, 1.f, 1.f);"
+"	return float4(input.uv, 0.f, 0.f);"
 "}";
 
 void CheckResult(HRESULT result)
@@ -170,63 +170,6 @@ void CRender::Init()
 
 	CheckResult( D3DCompile(vsShader, strlen(vsShader), NULL, nullptr, nullptr, "vsFullScreen", "vs_5_0", 0, 0, &vsShaderBlob, &errorBlob), errorBlob );
 	CheckResult( D3DCompile(psShader, strlen(psShader), NULL, nullptr, nullptr, "psMain", "ps_5_0", 0, 0, &psShaderBlob, &errorBlob), errorBlob );
-
-	D3D12_RASTERIZER_DESC rasterizerState =
-	{
-		/*FillMode*/					D3D12_FILL_MODE_SOLID
-		/*CullMode*/					,D3D12_CULL_MODE_BACK
-		/*FrontCounterClockwise*/		,FALSE
-		/*DepthBias*/					,D3D12_DEFAULT_DEPTH_BIAS
-		/*DepthBiasClamp*/				,D3D12_DEFAULT_DEPTH_BIAS_CLAMP
-		/*SlopeScaledDepthBias*/		,D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS
-		/*DepthClipEnable*/				,FALSE
-		/*MultisampleEnable*/			,FALSE
-		/*AntialiasedLineEnable*/		,FALSE
-		/*ForcedSampleCount*/			,0
-		/*ConservativeRaster*/			,D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF
-	};
-	static D3D12_BLEND_DESC const blendState =
-	{
-		/*AlphaToCoverageEnable*/					FALSE
-		/*IndependentBlendEnable*/					,FALSE
-		/*RenderTarget[0].BlendEnable*/				,FALSE
-		/*RenderTarget[0].LogicOpEnable*/			,FALSE
-		/*RenderTarget[0].SrcBlend*/				,D3D12_BLEND_ONE
-		/*RenderTarget[0].DestBlend*/				,D3D12_BLEND_ZERO
-		/*RenderTarget[0].BlendOp*/					,D3D12_BLEND_OP_ADD
-		/*RenderTarget[0].SrcBlendAlpha*/			,D3D12_BLEND_ONE
-		/*RenderTarget[0].DestBlendAlpha*/			,D3D12_BLEND_ZERO
-		/*RenderTarget[0].BlendOpAlpha*/			,D3D12_BLEND_OP_ADD
-		/*RenderTarget[0].LogicOp*/					,D3D12_LOGIC_OP_NOOP
-		/*RenderTarget[0].RenderTargetWriteMask*/	,D3D12_COLOR_WRITE_ENABLE_ALL
-		/*RenderTarget[1].BlendEnable*/				,FALSE
-		/*RenderTarget[1].LogicOpEnable*/			,FALSE
-		/*RenderTarget[1].SrcBlend*/				,D3D12_BLEND_ONE
-		/*RenderTarget[1].DestBlend*/				,D3D12_BLEND_ZERO
-		/*RenderTarget[1].BlendOp*/					,D3D12_BLEND_OP_ADD
-		/*RenderTarget[1].SrcBlendAlpha*/			,D3D12_BLEND_ONE
-		/*RenderTarget[1].DestBlendAlpha*/			,D3D12_BLEND_ZERO
-		/*RenderTarget[1].BlendOpAlpha*/			,D3D12_BLEND_OP_ADD
-		/*RenderTarget[1].LogicOp*/					,D3D12_LOGIC_OP_NOOP
-		/*RenderTarget[1].RenderTargetWriteMask*/	,D3D12_COLOR_WRITE_ENABLE_ALL
-	};
-	static D3D12_DEPTH_STENCIL_DESC const depthStencilState =
-	{
-		/*DepthEnable*/							FALSE
-		/*DepthWriteMask*/						,D3D12_DEPTH_WRITE_MASK_ALL
-		/*DepthFunc*/							,D3D12_COMPARISON_FUNC_LESS
-		/*StencilEnable*/						,FALSE
-		/*StencilReadMask*/						,D3D12_DEFAULT_STENCIL_READ_MASK
-		/*StencilWriteMask*/					,D3D12_DEFAULT_STENCIL_WRITE_MASK
-		/*FrontFace.StencilFailOp*/				,{ D3D12_STENCIL_OP_REPLACE
-		/*FrontFace.StencilDepthFailOp*/		,D3D12_STENCIL_OP_REPLACE
-		/*FrontFace.StencilPassOp*/				,D3D12_STENCIL_OP_REPLACE
-		/*FrontFace.StencilFunc*/				,D3D12_COMPARISON_FUNC_ALWAYS }
-		/*BackFace.StencilFailOp*/				,{ D3D12_STENCIL_OP_REPLACE
-		/*BackFace.StencilDepthFailOp*/			,D3D12_STENCIL_OP_REPLACE
-		/*BackFace.StencilPassOp*/				,D3D12_STENCIL_OP_REPLACE
-		/*BackFace.StencilFunc*/				,D3D12_COMPARISON_FUNC_ALWAYS }
-	};
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
 	psoDesc.pRootSignature = m_rootSignature;
