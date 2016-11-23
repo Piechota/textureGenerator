@@ -19,20 +19,31 @@ private:
 	ID3D12GraphicsCommandList* m_textureCL;
 	ID3D12CommandAllocator*	m_textureCA;
 	ID3D12CommandQueue* m_textureCQ;
+	ID3D12GraphicsCommandList* m_copyCL;
+	ID3D12CommandAllocator*	m_copyCA;
+	ID3D12CommandQueue* m_copyCQ;
+	ID3D12RootSignature* m_rootSignature;
 	ID3D12PipelineState* m_texturePSO;
 
 	ID3D12DescriptorHeap* m_renderTargetHeap;
 	ID3D12Resource* m_renderTargetRes;
+	ID3D12Resource* m_cpuAccessRes;
+
+	D3D12_PLACED_SUBRESOURCE_FOOTPRINT m_renderTargetFootprint;
 
 	UINT m_fenceValue;
 	HANDLE m_fenceEvent;
 
-private:
-	void CheckResult(HRESULT result);
+	D3D12_VIEWPORT m_viewport;
+	D3D12_RECT m_scissorRect;
+
+	BYTE* m_renderTargetData;
 
 public:
 	void Init();
 	void Release();
+	void GenerateImage();
+	void* GetRenderTargetData();
 };
 
 extern CRender GRender;
