@@ -1,11 +1,18 @@
 #pragma once
-
 #pragma comment( lib, "d3d12" )
 #pragma comment( lib, "dxgi" )
 #pragma comment( lib, "d3dcompiler" )
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
+
+struct STextureMetadata
+{
+	D3D12_PLACED_SUBRESOURCE_FOOTPRINT m_textureFootprint;
+	UINT64 m_textureSize;
+	UINT m_numRows;
+	UINT64 m_rowSize;
+};
 
 class CRender
 {
@@ -21,14 +28,13 @@ private:
 	ID3D12CommandQueue* m_textureCQ;
 	ID3D12RootSignature* m_rootSignature;
 	ID3D12PipelineState* m_texturePSO;
+	ID3DBlob* m_vsBlob;
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC m_texturePsoDesc;
 
 	ID3D12DescriptorHeap* m_renderTargetHeap;
 	ID3D12Resource* m_renderTargetRes;
 
-	D3D12_PLACED_SUBRESOURCE_FOOTPRINT m_renderTargetFootprint;
-	UINT64 m_bufferSize;
-	UINT m_numRows;
-	UINT64 m_rowSize;
+	STextureMetadata m_textureMetadata;
 	
 	UINT m_fenceValue;
 	HANDLE m_fenceEvent;
@@ -41,8 +47,10 @@ private:
 public:
 	void Init();
 	void Release();
+	void ChangePixelShader(char const* psCode);
 	void GenerateImage();
-	void* GetRenderTargetData();
+	void* GetRenderTargetData() const;
+	STextureMetadata const& GetTextureMetadata() const { return m_textureMetadata; }
 };
 
 extern CRender GRender;
