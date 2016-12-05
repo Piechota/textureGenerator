@@ -30,6 +30,7 @@ private:
 	ID3D12PipelineState* m_texturePSO;
 	ID3DBlob* m_vsBlob;
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC m_texturePsoDesc;
+	D3D12_RESOURCE_DESC	m_renderTargetDesc;
 
 	ID3D12DescriptorHeap* m_renderTargetHeap;
 	ID3D12Resource* m_renderTargetRes;
@@ -51,6 +52,7 @@ public:
 	void GenerateImage();
 	void* GetRenderTargetData() const;
 	STextureMetadata const& GetTextureMetadata() const { return m_textureMetadata; }
+	void ChangeTargetSize(UINT const width, UINT const height);
 };
 
 extern CRender GRender;

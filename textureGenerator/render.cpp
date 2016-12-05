@@ -33,6 +33,14 @@ char const* psShader =
 "	return float4(0.f, 0.f, 1.f, 1.f);"
 "}";
 
+D3D12_HEAP_PROPERTIES const GRenderTargetHeapProp =
+{
+	D3D12_HEAP_TYPE_CUSTOM,
+	D3D12_CPU_PAGE_PROPERTY_WRITE_BACK,
+	D3D12_MEMORY_POOL_L0,
+	0, 0
+};
+
 void CheckResult(HRESULT result)
 {
 	if (FAILED(result))
@@ -101,14 +109,7 @@ void CRender::Init()
 
 	CheckResult(m_device->CreateDescriptorHeap(&renderTargetHeapDesc, IID_PPV_ARGS(&m_renderTargetHeap)));
 
-	D3D12_HEAP_PROPERTIES const renderTargetHeapProp =
-	{
-		D3D12_HEAP_TYPE_CUSTOM,
-		D3D12_CPU_PAGE_PROPERTY_WRITE_BACK,
-		D3D12_MEMORY_POOL_L0,
-		0, 0
-	};
-	D3D12_RESOURCE_DESC const renderTargetResDesc = 
+	m_renderTargetDesc = 
 	{
 		D3D12_RESOURCE_DIMENSION_TEXTURE2D,
 		0,
@@ -122,11 +123,11 @@ void CRender::Init()
 		D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET
 	};
 
-	CheckResult(m_device->CreateCommittedResource(&renderTargetHeapProp, D3D12_HEAP_FLAG_NONE, &renderTargetResDesc, D3D12_RESOURCE_STATE_RENDER_TARGET | D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_renderTargetRes)));
+	CheckResult(m_device->CreateCommittedResource(&GRenderTargetHeapProp, D3D12_HEAP_FLAG_NONE, &m_renderTargetDesc, D3D12_RESOURCE_STATE_RENDER_TARGET | D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_renderTargetRes)));
 	m_device->CreateRenderTargetView(m_renderTargetRes, nullptr, m_renderTargetHeap->GetCPUDescriptorHandleForHeapStart());
 
 	
-	m_device->GetCopyableFootprints(&renderTargetResDesc, 0, 1, 0, &m_textureMetadata.m_textureFootprint, &m_textureMetadata.m_numRows, &m_textureMetadata.m_rowSize, &m_textureMetadata.m_textureSize);
+	m_device->GetCopyableFootprints(&m_renderTargetDesc, 0, 1, 0, &m_textureMetadata.m_textureFootprint, &m_textureMetadata.m_numRows, &m_textureMetadata.m_rowSize, &m_textureMetadata.m_textureSize);
 
 	m_renderTargetData = new BYTE[m_textureMetadata.m_textureSize];
 
@@ -227,6 +228,26 @@ void* CRender::GetRenderTargetData() const
 {
 	CheckResult(m_renderTargetRes->ReadFromSubresource((void*)m_renderTargetData, m_textureMetadata.m_textureFootprint.Footprint.RowPitch, m_textureMetadata.m_textureSize, 0, nullptr));
 	return m_renderTargetData;
+}
+
+void CRender::ChangeTargetSize(UINT const width, UINT const height)
+{
+	m_renderTargetRes->Release();
+	m_renderTargetDesc.Width = width;
+	m_renderTargetDesc.Height = height;
+
+	CheckResult(m_device->CreateCommittedResource(&GRenderTargetHeapProp, D3D12_HEAP_FLAG_NONE, &m_renderTargetDesc, D3D12_RESOURCE_STATE_RENDER_TARGET | D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_renderTargetRes)));
+	m_device->CreateRenderTargetView(m_renderTargetRes, nullptr, m_renderTargetHeap->GetCPUDescriptorHandleForHeapStart());
+
+	m_device->GetCopyableFootprints(&m_renderTargetDesc, 0, 1, 0, &m_textureMetadata.m_textureFootprint, &m_textureMetadata.m_numRows, &m_textureMetadata.m_rowSize, &m_textureMetadata.m_textureSize);
+	delete[] m_renderTargetData;
+	m_renderTargetData = new BYTE[m_textureMetadata.m_textureSize];
+
+	m_viewport.Width = (float)width;
+	m_viewport.Height = (float)height;
+
+	m_scissorRect.right = width;
+	m_scissorRect.bottom = height;
 }
 
 CRender GRender;
