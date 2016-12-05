@@ -5,6 +5,7 @@
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
+#include <QtCore/QString>
 
 struct STextureMetadata
 {
@@ -48,7 +49,7 @@ private:
 public:
 	void Init();
 	void Release();
-	void ChangePixelShader(char const* psCode);
+	bool ChangePixelShader(char const* psCode, QString& output);
 	void GenerateImage();
 	void* GetRenderTargetData() const;
 	STextureMetadata const& GetTextureMetadata() const { return m_textureMetadata; }

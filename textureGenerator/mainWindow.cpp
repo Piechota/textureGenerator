@@ -3,19 +3,16 @@
 #include <QtWidgets/QScrollArea>
 #include <QtWidgets/QBoxLayout>
 #include <QtWidgets/QPushButton>
+#include <QtWidgets/QSplitter>
 #include <QtGui/QImage>
 
-void CMainWindow::SlotGenerateImage()
+void CMainWindow::GenerateImage()
 {
-	QString const shaderCodeStr = m_pteCodeEditor->toPlainText();
-	QByteArray const shaderCodeCharArray = shaderCodeStr.toLatin1();
-
-	GRender.ChangePixelShader(shaderCodeCharArray.data());
 	GRender.GenerateImage();
 
 	BYTE* textureData = (BYTE*)GRender.GetRenderTargetData();
 	STextureMetadata const& textureMetadata = GRender.GetTextureMetadata();
-	
+
 	QImage textureImage(m_imageWidth, m_imageHeight, QImage::Format_RGBA8888);
 	for (UINT rowID = 0; rowID < textureMetadata.m_numRows; ++rowID)
 	{
@@ -26,12 +23,25 @@ void CMainWindow::SlotGenerateImage()
 	m_lGeneratedImage->setPixmap(QPixmap::fromImage(textureImage));
 }
 
+void CMainWindow::SlotGenerateImage()
+{
+	QString const shaderCodeStr = m_pteCodeEditor->toPlainText();
+	QByteArray const shaderCodeCharArray = shaderCodeStr.toLatin1();
+
+	QString output;
+	if (GRender.ChangePixelShader(shaderCodeCharArray.data(), output))
+	{
+		GenerateImage();
+	}
+	m_lShadersOutput->setText(output);
+}
+
 void CMainWindow::SlotImageSizeChange()
 {
 	m_imageWidth = m_leImageWidth->text().toUInt();
 	m_imageHeight = m_leImageHeight->text().toUInt();
 	GRender.ChangeTargetSize(m_imageWidth, m_imageHeight);
-	SlotGenerateImage();
+	GenerateImage();
 }
 
 CMainWindow::CMainWindow()
@@ -61,6 +71,11 @@ CMainWindow::CMainWindow()
 		"}\n"
 	);
 
+	m_lShadersOutput = new QLabel();
+	m_lShadersOutput->setWordWrap(true);
+	m_lShadersOutput->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+	m_lShadersOutput->setStyleSheet("QLabel { background-color : grey; }");
+
 	m_leImageWidth = new QLineEdit(QString::number(m_imageWidth));
 	m_leImageHeight = new QLineEdit(QString::number(m_imageHeight));
 	QPushButton* applyImageSize = new QPushButton("Apply");
@@ -77,8 +92,12 @@ CMainWindow::CMainWindow()
 	imageLayout->addLayout(imageSizeLayout);
 	imageLayout->addWidget(m_lGeneratedImage);
 
+	QSplitter* shaderCodeOutputSplitter = new QSplitter(Qt::Vertical);
+	shaderCodeOutputSplitter->addWidget(m_pteCodeEditor);
+	shaderCodeOutputSplitter->addWidget(m_lShadersOutput);
+
 	QBoxLayout* codeEditLayout = new QBoxLayout(QBoxLayout::TopToBottom);
-	codeEditLayout->addWidget(m_pteCodeEditor);
+	codeEditLayout->addWidget(shaderCodeOutputSplitter);
 	codeEditLayout->addWidget(btnGenerate);
 
 	QBoxLayout* boxLayout = new QBoxLayout(QBoxLayout::LeftToRight);

@@ -186,23 +186,30 @@ void CRender::Release()
 #endif // _DEBUG
 }
 
-void CRender::ChangePixelShader(char const* psCode)
+bool CRender::ChangePixelShader(char const* psCode, QString& output)
 {
 	ID3DBlob* errorBlob = nullptr;
 	ID3DBlob* psShaderBlob;
-	CheckResult(D3DCompile(psCode, strlen(psCode), NULL, nullptr, nullptr, "psMain", "ps_5_0", 0, 0, &psShaderBlob, &errorBlob), errorBlob);
 
-	m_texturePsoDesc.PS.BytecodeLength = psShaderBlob->GetBufferSize();
-	m_texturePsoDesc.PS.pShaderBytecode = psShaderBlob->GetBufferPointer();
+	bool const retValue = SUCCEEDED(D3DCompile(psCode, strlen(psCode), NULL, nullptr, nullptr, "psMain", "ps_5_0", 0, 0, &psShaderBlob, &errorBlob));
 
-	m_texturePSO->Release();
-	CheckResult(m_device->CreateGraphicsPipelineState(&m_texturePsoDesc, IID_PPV_ARGS(&m_texturePSO)));
+	if (retValue)
+	{
+		m_texturePsoDesc.PS.BytecodeLength = psShaderBlob->GetBufferSize();
+		m_texturePsoDesc.PS.pShaderBytecode = psShaderBlob->GetBufferPointer();
 
-	psShaderBlob->Release();
+		m_texturePSO->Release();
+		CheckResult(m_device->CreateGraphicsPipelineState(&m_texturePsoDesc, IID_PPV_ARGS(&m_texturePSO)));
+
+		psShaderBlob->Release();
+	}
+
 	if (errorBlob)
 	{
+		output = (char const*)errorBlob->GetBufferPointer() + '\n';
 		errorBlob->Release();
 	}
+	return retValue;
 }
 
 void CRender::GenerateImage()

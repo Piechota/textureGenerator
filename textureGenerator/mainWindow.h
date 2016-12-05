@@ -15,9 +15,13 @@ private:
 	QLineEdit* m_leImageHeight;
 	QLabel* m_lGeneratedImage;
 	QPlainTextEdit* m_pteCodeEditor;
+	QLabel* m_lShadersOutput;
 
 	UINT m_imageWidth;
 	UINT m_imageHeight;
+
+private:
+	void GenerateImage();
 
 private slots:
 	void SlotGenerateImage();
