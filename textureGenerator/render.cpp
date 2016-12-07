@@ -137,16 +137,15 @@ void CRender::Init()
 	CheckResult(D3D12SerializeRootSignature(&rootDesc, D3D_ROOT_SIGNATURE_VERSION_1, &rootSignatureBlob, &errorBlob), errorBlob);
 	CheckResult(m_device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(), rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
 
-	ID3DBlob* psShaderBlob;
 	CheckResult( D3DCompile(vsShader, strlen(vsShader), NULL, nullptr, nullptr, "vsFullScreen", "vs_5_0", 0, 0, &m_vsBlob, &errorBlob), errorBlob );
-	CheckResult( D3DCompile(psShader, strlen(psShader), NULL, nullptr, nullptr, "psMain", "ps_5_0", 0, 0, &psShaderBlob, &errorBlob), errorBlob );
+	CheckResult( D3DCompile(psShader, strlen(psShader), NULL, nullptr, nullptr, "psMain", "ps_5_0", 0, 0, &m_psBlob, &errorBlob), errorBlob );
 
 	m_texturePsoDesc = {};
 	m_texturePsoDesc.pRootSignature = m_rootSignature;
 	m_texturePsoDesc.VS.BytecodeLength = m_vsBlob->GetBufferSize();
 	m_texturePsoDesc.VS.pShaderBytecode = m_vsBlob->GetBufferPointer();
-	m_texturePsoDesc.PS.BytecodeLength = psShaderBlob->GetBufferSize();
-	m_texturePsoDesc.PS.pShaderBytecode = psShaderBlob->GetBufferPointer();
+	m_texturePsoDesc.PS.BytecodeLength = m_psBlob->GetBufferSize();
+	m_texturePsoDesc.PS.pShaderBytecode = m_psBlob->GetBufferPointer();
 	
 	m_texturePsoDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 	m_texturePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
@@ -160,7 +159,6 @@ void CRender::Init()
 	CheckResult(m_device->CreateGraphicsPipelineState(&m_texturePsoDesc, IID_PPV_ARGS(&m_texturePSO)));
 
 	rootSignatureBlob->Release();
-	psShaderBlob->Release();
 	if ( errorBlob )
 	{
 		errorBlob->Release();
@@ -195,13 +193,14 @@ bool CRender::ChangePixelShader(char const* psCode, QString& output)
 
 	if (retValue)
 	{
-		m_texturePsoDesc.PS.BytecodeLength = psShaderBlob->GetBufferSize();
-		m_texturePsoDesc.PS.pShaderBytecode = psShaderBlob->GetBufferPointer();
+		m_psBlob->Release();
+		m_psBlob = psShaderBlob;
+
+		m_texturePsoDesc.PS.BytecodeLength = m_psBlob->GetBufferSize();
+		m_texturePsoDesc.PS.pShaderBytecode = m_psBlob->GetBufferPointer();
 
 		m_texturePSO->Release();
 		CheckResult(m_device->CreateGraphicsPipelineState(&m_texturePsoDesc, IID_PPV_ARGS(&m_texturePSO)));
-
-		psShaderBlob->Release();
 	}
 
 	if (errorBlob)
@@ -237,8 +236,24 @@ void* CRender::GetRenderTargetData() const
 	return m_renderTargetData;
 }
 
-void CRender::ChangeTargetSize(UINT const width, UINT const height)
+bool CRender::ChangeImageSettings(UINT const width, UINT const height, DXGI_FORMAT const dxgiFormat)
 {
+	if (m_renderTargetDesc.Format != dxgiFormat)
+	{
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC texturePsoDesc = m_texturePsoDesc;
+		texturePsoDesc.RTVFormats[0] = dxgiFormat;
+		ID3D12PipelineState* texturePso;
+		if (FAILED(m_device->CreateGraphicsPipelineState(&texturePsoDesc, IID_PPV_ARGS(&texturePso))))
+		{
+			return false;
+		}
+
+		m_texturePSO->Release();
+		m_texturePSO = texturePso;
+		m_texturePsoDesc = texturePsoDesc;
+		m_renderTargetDesc.Format = dxgiFormat;
+	}
+
 	m_renderTargetRes->Release();
 	m_renderTargetDesc.Width = width;
 	m_renderTargetDesc.Height = height;
@@ -255,6 +270,8 @@ void CRender::ChangeTargetSize(UINT const width, UINT const height)
 
 	m_scissorRect.right = width;
 	m_scissorRect.bottom = height;
+
+	return true;
 }
 
 CRender GRender;

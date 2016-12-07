@@ -30,6 +30,7 @@ private:
 	ID3D12RootSignature* m_rootSignature;
 	ID3D12PipelineState* m_texturePSO;
 	ID3DBlob* m_vsBlob;
+	ID3DBlob* m_psBlob;
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC m_texturePsoDesc;
 	D3D12_RESOURCE_DESC	m_renderTargetDesc;
 
@@ -53,7 +54,7 @@ public:
 	void GenerateImage();
 	void* GetRenderTargetData() const;
 	STextureMetadata const& GetTextureMetadata() const { return m_textureMetadata; }
-	void ChangeTargetSize(UINT const width, UINT const height);
+	bool ChangeImageSettings(UINT const width, UINT const height, DXGI_FORMAT const dxgiFormat);
 };
 
 extern CRender GRender;

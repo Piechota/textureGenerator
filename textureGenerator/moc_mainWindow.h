@@ -20,7 +20,7 @@
 QT_BEGIN_MOC_NAMESPACE
 struct qt_meta_stringdata_CMainWindow_t {
     QByteArrayData data[4];
-    char stringdata0[51];
+    char stringdata0[55];
 };
 #define QT_MOC_LITERAL(idx, ofs, len) \
     Q_STATIC_BYTE_ARRAY_DATA_HEADER_INITIALIZER_WITH_OFFSET(len, \
@@ -32,11 +32,11 @@ static const qt_meta_stringdata_CMainWindow_t qt_meta_stringdata_CMainWindow = {
 QT_MOC_LITERAL(0, 0, 11), // "CMainWindow"
 QT_MOC_LITERAL(1, 12, 17), // "SlotGenerateImage"
 QT_MOC_LITERAL(2, 30, 0), // ""
-QT_MOC_LITERAL(3, 31, 19) // "SlotImageSizeChange"
+QT_MOC_LITERAL(3, 31, 23) // "SlotImageSettingsChange"
 
     },
     "CMainWindow\0SlotGenerateImage\0\0"
-    "SlotImageSizeChange"
+    "SlotImageSettingsChange"
 };
 #undef QT_MOC_LITERAL
 
@@ -71,7 +71,7 @@ void CMainWindow::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id,
         Q_UNUSED(_t)
         switch (_id) {
         case 0: _t->SlotGenerateImage(); break;
-        case 1: _t->SlotImageSizeChange(); break;
+        case 1: _t->SlotImageSettingsChange(); break;
         default: ;
         }
     }

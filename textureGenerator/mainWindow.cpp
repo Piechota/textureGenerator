@@ -4,7 +4,6 @@
 #include <QtWidgets/QBoxLayout>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QSplitter>
-#include <QtGui/QImage>
 
 void CMainWindow::GenerateImage()
 {
@@ -13,7 +12,7 @@ void CMainWindow::GenerateImage()
 	BYTE* textureData = (BYTE*)GRender.GetRenderTargetData();
 	STextureMetadata const& textureMetadata = GRender.GetTextureMetadata();
 
-	QImage textureImage(m_imageWidth, m_imageHeight, QImage::Format_RGBA8888);
+	QImage textureImage(m_imageWidth, m_imageHeight, m_formatsToQtFormat[m_imageFormatID]);
 	for (UINT rowID = 0; rowID < textureMetadata.m_numRows; ++rowID)
 	{
 		BYTE* srcData = textureData + rowID * textureMetadata.m_textureFootprint.Footprint.RowPitch;
@@ -36,12 +35,16 @@ void CMainWindow::SlotGenerateImage()
 	m_lShadersOutput->setText(output);
 }
 
-void CMainWindow::SlotImageSizeChange()
+void CMainWindow::SlotImageSettingsChange()
 {
 	m_imageWidth = m_leImageWidth->text().toUInt();
 	m_imageHeight = m_leImageHeight->text().toUInt();
-	GRender.ChangeTargetSize(m_imageWidth, m_imageHeight);
-	GenerateImage();
+	m_imageFormatID = m_cbFormats->currentIndex();
+	DXGI_FORMAT const dxgiFormat = m_formatsToDXGI[m_imageFormatID];
+	if (GRender.ChangeImageSettings(m_imageWidth, m_imageHeight, dxgiFormat))
+	{
+		GenerateImage();
+	}
 }
 
 CMainWindow::CMainWindow()
@@ -79,13 +82,22 @@ CMainWindow::CMainWindow()
 	m_leImageWidth = new QLineEdit(QString::number(m_imageWidth));
 	m_leImageHeight = new QLineEdit(QString::number(m_imageHeight));
 	QPushButton* applyImageSize = new QPushButton("Apply");
-	connect(applyImageSize, SIGNAL(clicked()), this, SLOT(SlotImageSizeChange()));
+	connect(applyImageSize, SIGNAL(clicked()), this, SLOT(SlotImageSettingsChange()));
+
+	QStringList formatsNames;
+	formatsNames.append("R8G8B8A8");
+	formatsNames.append("Grayscale");
+
+	m_cbFormats = new QComboBox();
+	m_cbFormats->addItems(formatsNames);
 
 	QBoxLayout* imageSizeLayout = new QBoxLayout(QBoxLayout::LeftToRight);
 	imageSizeLayout->addWidget(new QLabel("Width: "));
 	imageSizeLayout->addWidget(m_leImageWidth);
 	imageSizeLayout->addWidget(new QLabel("Height: "));
 	imageSizeLayout->addWidget(m_leImageHeight);
+	imageSizeLayout->addWidget(new QLabel("Format: "));
+	imageSizeLayout->addWidget(m_cbFormats);
 	imageSizeLayout->addWidget(applyImageSize);
 
 	QBoxLayout* imageLayout = new QBoxLayout(QBoxLayout::TopToBottom);
@@ -110,4 +122,10 @@ CMainWindow::CMainWindow()
 	QMainWindow::setBaseSize(1000, 600);
 	QMainWindow::setCentralWidget(centerWidget);
 	QMainWindow::show();
+
+	m_formatsToQtFormat[ETextureFormats::R8G8B8A8] = QImage::Format_RGBA8888;
+	m_formatsToQtFormat[ETextureFormats::Grayscale] = QImage::Format_Grayscale8;
+
+	m_formatsToDXGI[ETextureFormats::R8G8B8A8] = DXGI_FORMAT_R8G8B8A8_UNORM;
+	m_formatsToDXGI[ETextureFormats::Grayscale] = DXGI_FORMAT_R8_UNORM;
 }
