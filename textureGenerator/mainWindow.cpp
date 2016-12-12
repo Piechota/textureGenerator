@@ -4,6 +4,14 @@
 #include <QtWidgets/QBoxLayout>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QSplitter>
+#include <QtWidgets/QDockWidget>
+
+void CMainWindow::FitImage()
+{
+	m_lGeneratedImage->resize(m_scrollAreaSize);
+	m_pGeneratedImage = m_pGeneratedImage.scaled(m_scrollAreaSize, Qt::KeepAspectRatio);
+	m_lGeneratedImage->setPixmap(m_pGeneratedImage);
+}
 
 void CMainWindow::GenerateImage()
 {
@@ -19,7 +27,9 @@ void CMainWindow::GenerateImage()
 		BYTE* dstData = textureImage.bits() + rowID * textureMetadata.m_rowSize;
 		memcpy(dstData, srcData, textureMetadata.m_rowSize);
 	}
-	m_lGeneratedImage->setPixmap(QPixmap::fromImage(textureImage));
+	m_pGeneratedImage.convertFromImage(textureImage);
+	m_lGeneratedImage->setPixmap(m_pGeneratedImage);
+	FitImage();
 }
 
 void CMainWindow::SlotGenerateImage()
@@ -41,10 +51,18 @@ void CMainWindow::SlotImageSettingsChange()
 	m_imageHeight = m_leImageHeight->text().toUInt();
 	m_imageFormatID = m_cbFormats->currentIndex();
 	DXGI_FORMAT const dxgiFormat = m_formatsToDXGI[m_imageFormatID];
+	m_isaImageScroll->ResetScale();
+	m_scrollAreaSize = m_isaImageScroll->size() * m_isaImageScroll->GetScale();
 	if (GRender.ChangeImageSettings(m_imageWidth, m_imageHeight, dxgiFormat))
 	{
 		GenerateImage();
 	}
+}
+
+void CMainWindow::SlotScaleChanged()
+{
+	m_scrollAreaSize = m_scrollAreaSize * m_isaImageScroll->GetScale();
+	FitImage();
 }
 
 CMainWindow::CMainWindow()
@@ -55,7 +73,7 @@ CMainWindow::CMainWindow()
 
 	m_lGeneratedImage = new QLabel();
 
-	QPushButton* btnGenerate = new QPushButton("Generate Image");
+	QPushButton* btnGenerate = new QPushButton("Reload shader");
 	connect(btnGenerate, SIGNAL(clicked()), this, SLOT(SlotGenerateImage()));
 
 	m_pteCodeEditor = new QPlainTextEdit();
@@ -100,27 +118,38 @@ CMainWindow::CMainWindow()
 	imageSizeLayout->addWidget(m_cbFormats);
 	imageSizeLayout->addWidget(applyImageSize);
 
+	m_isaImageScroll = new CImageScrollArea();
+	m_isaImageScroll->setBackgroundRole(QPalette::Dark);
+	m_isaImageScroll->setWidget(m_lGeneratedImage);
+	m_isaImageScroll->setWidgetResizable(false);
+	connect(m_isaImageScroll, SIGNAL(ScaleChanged()), this, SLOT(SlotScaleChanged()));
+
 	QBoxLayout* imageLayout = new QBoxLayout(QBoxLayout::TopToBottom);
 	imageLayout->addLayout(imageSizeLayout);
-	imageLayout->addWidget(m_lGeneratedImage);
-
-	QSplitter* shaderCodeOutputSplitter = new QSplitter(Qt::Vertical);
-	shaderCodeOutputSplitter->addWidget(m_pteCodeEditor);
-	shaderCodeOutputSplitter->addWidget(m_lShadersOutput);
+	imageLayout->addWidget(m_isaImageScroll);
 
 	QBoxLayout* codeEditLayout = new QBoxLayout(QBoxLayout::TopToBottom);
-	codeEditLayout->addWidget(shaderCodeOutputSplitter);
+	codeEditLayout->addWidget(m_pteCodeEditor);
 	codeEditLayout->addWidget(btnGenerate);
 
-	QBoxLayout* boxLayout = new QBoxLayout(QBoxLayout::LeftToRight);
-	boxLayout->addLayout(imageLayout);
-	boxLayout->addLayout(codeEditLayout);
+	QWidget* dummyWidget = new QWidget();
+	dummyWidget->setLayout(codeEditLayout);
+
+	QDockWidget* codeDockWidget = new QDockWidget("Code edit");
+	codeDockWidget->setFeatures(QFlags<QDockWidget::DockWidgetFeature>(QDockWidget::DockWidgetFeature::DockWidgetFloatable | QDockWidget::DockWidgetFeature::DockWidgetMovable));
+	codeDockWidget->setWidget(dummyWidget);
+
+	QDockWidget* outputDockWidget = new QDockWidget("Output");
+	outputDockWidget->setFeatures(QFlags<QDockWidget::DockWidgetFeature>(QDockWidget::DockWidgetFeature::DockWidgetFloatable | QDockWidget::DockWidgetFeature::DockWidgetMovable));
+	outputDockWidget->setWidget(m_lShadersOutput);
 
 	QScrollArea* centerWidget = new QScrollArea();
-	centerWidget->setLayout(boxLayout);
+	centerWidget->setLayout(imageLayout);
 
-	QMainWindow::setBaseSize(1000, 600);
 	QMainWindow::setCentralWidget(centerWidget);
+	QMainWindow::addDockWidget(Qt::RightDockWidgetArea, codeDockWidget);
+	QMainWindow::addDockWidget(Qt::BottomDockWidgetArea, outputDockWidget);
+	QMainWindow::resize(600, 600);
 	QMainWindow::show();
 
 	m_formatsToQtFormat[ETextureFormats::R8G8B8A8] = QImage::Format_RGBA8888;
@@ -128,4 +157,19 @@ CMainWindow::CMainWindow()
 
 	m_formatsToDXGI[ETextureFormats::R8G8B8A8] = DXGI_FORMAT_R8G8B8A8_UNORM;
 	m_formatsToDXGI[ETextureFormats::Grayscale] = DXGI_FORMAT_R8_UNORM;
+
+	m_scrollAreaSize = m_isaImageScroll->size() * m_isaImageScroll->GetScale();
+	SlotGenerateImage();
 }
+
+void CImageScrollArea::wheelEvent(QWheelEvent *event)
+{
+	QPoint const& angleDelta = event->angleDelta();
+	m_scale = 1.f + angleDelta.y() * (1.f / (120.f)) * 0.1f;
+	emit ScaleChanged();
+}
+
+CImageScrollArea::CImageScrollArea()
+	: QScrollArea()
+	, m_scale( 0.99f )
+{}

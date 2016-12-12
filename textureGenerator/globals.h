@@ -12,6 +12,7 @@
 #pragma comment( lib, "../qtLib/Qt5Gui" )
 #endif
 
+#include <assert.h>
 #include "render.h"
 
 #include <QtCore/QString>
