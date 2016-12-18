@@ -77,11 +77,15 @@ CMainWindow::CMainWindow()
 
 	m_pteCodeEditor->setPlainText
 	(
-		"float4 psMain(float4 position : SV_POSITION, float2 uv : TEXCOORD ) : SV_TARGET\n"
+		"float4 psMain(\n"
+		"	float4 position : SV_POSITION\n"
+		",	float2 uv : TEXCOORD\n"
+		") : SV_TARGET\n"
 		"{\n"
 		"	return float4(0.f, 0.f, 1.f, 1.f);\n"
 		"}\n"
 	);
+	m_pteCodeEditor->setTabStopWidth(m_pteCodeEditor->tabStopWidth() / 4);
 
 	m_lShadersOutput = new QLabel();
 	m_lShadersOutput->setWordWrap(true);
