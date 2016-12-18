@@ -6,12 +6,12 @@
 #include <QtWidgets/QSplitter>
 #include <QtWidgets/QDockWidget>
 
-void CMainWindow::FitImage()
+float const GCheckerboardScale = 50.f;
+uchar const GCheckerboardData[] =
 {
-	m_lGeneratedImage->resize(m_scrollAreaSize);
-	m_pGeneratedImage = m_pGeneratedImage.scaled(m_scrollAreaSize, Qt::KeepAspectRatio);
-	m_lGeneratedImage->setPixmap(m_pGeneratedImage);
-}
+	0xAA, 0x66, 0x00, 0x00,
+	0x66, 0xAA, 0x00, 0x00,
+};
 
 void CMainWindow::GenerateImage()
 {
@@ -23,13 +23,12 @@ void CMainWindow::GenerateImage()
 	QImage textureImage(m_imageWidth, m_imageHeight, m_formatsToQtFormat[m_imageFormatID]);
 	for (UINT rowID = 0; rowID < textureMetadata.m_numRows; ++rowID)
 	{
-		BYTE* srcData = textureData + rowID * textureMetadata.m_textureFootprint.Footprint.RowPitch;
+		BYTE* srcData = textureData + rowID * textureMetadata.m_rowPitch;
 		BYTE* dstData = textureImage.bits() + rowID * textureMetadata.m_rowSize;
 		memcpy(dstData, srcData, textureMetadata.m_rowSize);
 	}
 	m_pGeneratedImage.convertFromImage(textureImage);
-	m_lGeneratedImage->setPixmap(m_pGeneratedImage);
-	FitImage();
+	m_gpiGeneratedImage->setPixmap(m_pGeneratedImage);
 }
 
 void CMainWindow::SlotGenerateImage()
@@ -51,27 +50,25 @@ void CMainWindow::SlotImageSettingsChange()
 	m_imageHeight = m_leImageHeight->text().toUInt();
 	m_imageFormatID = m_cbFormats->currentIndex();
 	DXGI_FORMAT const dxgiFormat = m_formatsToDXGI[m_imageFormatID];
-	m_isaImageScroll->ResetScale();
-	m_scrollAreaSize = m_isaImageScroll->size() * m_isaImageScroll->GetScale();
 	if (GRender.ChangeImageSettings(m_imageWidth, m_imageHeight, dxgiFormat))
 	{
 		GenerateImage();
 	}
 }
 
-void CMainWindow::SlotScaleChanged()
+void CMainWindow::SlotFitView()
 {
-	m_scrollAreaSize = m_scrollAreaSize * m_isaImageScroll->GetScale();
-	FitImage();
+	m_gsImageScene->setSceneRect(m_gpiGeneratedImage->boundingRect());
+	m_ivImageView->fitInView(m_gpiGeneratedImage->boundingRect(), Qt::KeepAspectRatio);
+	m_ivImageView->ResetPosition();
 }
 
 CMainWindow::CMainWindow()
 	: m_imageWidth( 600 )
 	, m_imageHeight( 600 )
+	, m_imageFormatID( 0 )
 {
 	QMainWindow::setWindowTitle("Texture Generator");
-
-	m_lGeneratedImage = new QLabel();
 
 	QPushButton* btnGenerate = new QPushButton("Reload shader");
 	connect(btnGenerate, SIGNAL(clicked()), this, SLOT(SlotGenerateImage()));
@@ -80,13 +77,7 @@ CMainWindow::CMainWindow()
 
 	m_pteCodeEditor->setPlainText
 	(
-		"struct PSInput\n"
-		"{\n"
-		"	float4 position : SV_POSITION;\n"
-		"	float2 uv : TEXCOORD;\n"
-		"};\n"
-		"\n"
-		"float4 psMain(PSInput input) : SV_TARGET\n"
+		"float4 psMain(float4 position : SV_POSITION, float2 uv : TEXCOORD ) : SV_TARGET\n"
 		"{\n"
 		"	return float4(0.f, 0.f, 1.f, 1.f);\n"
 		"}\n"
@@ -101,6 +92,8 @@ CMainWindow::CMainWindow()
 	m_leImageHeight = new QLineEdit(QString::number(m_imageHeight));
 	QPushButton* applyImageSize = new QPushButton("Apply");
 	connect(applyImageSize, SIGNAL(clicked()), this, SLOT(SlotImageSettingsChange()));
+	QPushButton* fitInView = new QPushButton("FitInView");
+	connect(fitInView, SIGNAL(clicked()), this, SLOT(SlotFitView()));
 
 	QStringList formatsNames;
 	formatsNames.append("R8G8B8A8");
@@ -116,17 +109,25 @@ CMainWindow::CMainWindow()
 	imageSizeLayout->addWidget(m_leImageHeight);
 	imageSizeLayout->addWidget(new QLabel("Format: "));
 	imageSizeLayout->addWidget(m_cbFormats);
+	imageSizeLayout->addWidget(fitInView);
 	imageSizeLayout->addWidget(applyImageSize);
 
-	m_isaImageScroll = new CImageScrollArea();
-	m_isaImageScroll->setBackgroundRole(QPalette::Dark);
-	m_isaImageScroll->setWidget(m_lGeneratedImage);
-	m_isaImageScroll->setWidgetResizable(false);
-	connect(m_isaImageScroll, SIGNAL(ScaleChanged()), this, SLOT(SlotScaleChanged()));
+	QImage checkerboardImg((uchar*)GCheckerboardData, 2, 2, QImage::Format_Grayscale8);
+	m_gsImageScene = new QGraphicsScene();
+	m_gpiGeneratedImage = new QGraphicsPixmapItem();
+	m_gsImageScene->addItem(m_gpiGeneratedImage);
+
+	m_ivImageView = new CImageView(m_gsImageScene, m_gpiGeneratedImage);
+
+	m_ivImageView->GetCheckerboardBrush() = QBrush(checkerboardImg);
+	m_ivImageView->GetCheckerboardMatrix().reset();
+	m_ivImageView->GetCheckerboardMatrix().scale(GCheckerboardScale, GCheckerboardScale);
+	m_ivImageView->GetCheckerboardBrush().setMatrix(m_ivImageView->GetCheckerboardMatrix());
+	m_ivImageView->setBackgroundBrush(m_ivImageView->GetCheckerboardBrush());
 
 	QBoxLayout* imageLayout = new QBoxLayout(QBoxLayout::TopToBottom);
 	imageLayout->addLayout(imageSizeLayout);
-	imageLayout->addWidget(m_isaImageScroll);
+	imageLayout->addWidget(m_ivImageView);
 
 	QBoxLayout* codeEditLayout = new QBoxLayout(QBoxLayout::TopToBottom);
 	codeEditLayout->addWidget(m_pteCodeEditor);
@@ -158,18 +159,55 @@ CMainWindow::CMainWindow()
 	m_formatsToDXGI[ETextureFormats::R8G8B8A8] = DXGI_FORMAT_R8G8B8A8_UNORM;
 	m_formatsToDXGI[ETextureFormats::Grayscale] = DXGI_FORMAT_R8_UNORM;
 
-	m_scrollAreaSize = m_isaImageScroll->size() * m_isaImageScroll->GetScale();
-	SlotGenerateImage();
+	QString const shaderCodeStr = m_pteCodeEditor->toPlainText();
+	QByteArray const shaderCodeCharArray = shaderCodeStr.toLatin1();
+	DXGI_FORMAT const dxgiFormat = m_formatsToDXGI[m_imageFormatID];
+	QString output;
+	GRender.ChangePixelShader(shaderCodeCharArray.data(), output);
+	GRender.ChangeImageSettings(m_imageWidth, m_imageHeight, dxgiFormat);
+	GenerateImage();
+	m_ivImageView->fitInView(m_gpiGeneratedImage->boundingRect(), Qt::KeepAspectRatio);
 }
 
-void CImageScrollArea::wheelEvent(QWheelEvent *event)
+void CImageView::mouseMoveEvent(QMouseEvent *event)
 {
-	QPoint const& angleDelta = event->angleDelta();
-	m_scale = 1.f + angleDelta.y() * (1.f / (120.f)) * 0.1f;
-	emit ScaleChanged();
+	if (event->buttons() & Qt::LeftButton)
+	{
+		QPoint const mouseDelta = (event->pos() - m_oldMousePosition);
+		m_oldMousePosition = event->pos();
+
+		m_rootItem->moveBy( mouseDelta.x(), mouseDelta.y() );
+		m_checkerboardMatrix.translate(mouseDelta.x() * (1.f / GCheckerboardScale), mouseDelta.y() * (1.f / GCheckerboardScale));
+		m_checkerboardBrush.setMatrix(m_checkerboardMatrix);
+		QGraphicsView::setBackgroundBrush(m_checkerboardBrush);
+	}
 }
 
-CImageScrollArea::CImageScrollArea()
-	: QScrollArea()
-	, m_scale( 0.99f )
-{}
+void CImageView::mousePressEvent(QMouseEvent *event)
+{
+	if (event->button() == Qt::LeftButton)
+	{
+		m_oldMousePosition = event->pos();
+	}
+}
+
+void CImageView::wheelEvent(QWheelEvent *event)
+{
+	int const wheelSteps = event->angleDelta().y() / (8 * 15);
+	float const wheelScale = 1.f + wheelSteps * (4.f/360.f);
+	QGraphicsView::scale(wheelScale, wheelScale);
+}
+
+void CImageView::ResetPosition()
+{
+	m_rootItem->setPos(0.f, 0.f);
+
+	m_checkerboardMatrix.setMatrix
+	(
+		m_checkerboardMatrix.m11(), m_checkerboardMatrix.m12(),
+		m_checkerboardMatrix.m21(), m_checkerboardMatrix.m22(),
+		0.f, 0.f
+	);
+	m_checkerboardBrush.setMatrix(m_checkerboardMatrix);
+	QGraphicsView::setBackgroundBrush(m_checkerboardBrush);
+}

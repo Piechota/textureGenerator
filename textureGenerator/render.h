@@ -9,8 +9,7 @@
 
 struct STextureMetadata
 {
-	D3D12_PLACED_SUBRESOURCE_FOOTPRINT m_textureFootprint;
-	UINT64 m_textureSize;
+	UINT m_rowPitch;
 	UINT m_numRows;
 	UINT64 m_rowSize;
 };
@@ -46,6 +45,7 @@ private:
 	D3D12_RECT m_scissorRect;
 
 	BYTE* m_renderTargetData;
+	UINT64 m_textureSize;
 
 public:
 	void Init();

@@ -7,25 +7,34 @@
 #include <QtWidgets/QLineEdit>
 #include <QtGui/QImage>
 #include <QtWidgets/QComboBox>
-#include <QtWidgets/QScrollArea>
+#include <QtWidgets/QGraphicsScene>
+#include <QtWidgets/QGraphicsView>
+#include <QtWidgets/QGraphicsPixmapItem>
 
-class CImageScrollArea : public QScrollArea
+class CImageView : public QGraphicsView
 {
 	Q_OBJECT
-
 private:
-	float m_scale;
-	
+	QPoint m_oldMousePosition;
+	QGraphicsItem* m_rootItem;
+
+	QBrush m_checkerboardBrush;
+	QMatrix m_checkerboardMatrix;
+
 protected:
+	virtual void mouseMoveEvent(QMouseEvent *event) override;
+	virtual void mousePressEvent(QMouseEvent *event) override;
 	virtual void wheelEvent(QWheelEvent *event) override;
 
-signals:
-	void ScaleChanged();
-
 public:
-	CImageScrollArea();
-	float GetScale() const { return m_scale; }
-	void ResetScale() { m_scale = 0.99f; }
+	CImageView( QGraphicsScene* scene, QGraphicsItem* root )
+		: QGraphicsView( scene )
+		, m_rootItem( root )
+	{}
+
+	QBrush& GetCheckerboardBrush() { return m_checkerboardBrush; }
+	QMatrix& GetCheckerboardMatrix() { return m_checkerboardMatrix; }
+	void ResetPosition();
 };
 
 class CMainWindow : public QMainWindow
@@ -47,26 +56,24 @@ private:
 	QLineEdit* m_leImageWidth;
 	QLineEdit* m_leImageHeight;
 	QComboBox* m_cbFormats;
-	CImageScrollArea* m_isaImageScroll;
-	QLabel* m_lGeneratedImage;
+	QGraphicsScene* m_gsImageScene;
+	CImageView* m_ivImageView;
+	QGraphicsPixmapItem* m_gpiGeneratedImage;
 	QPixmap m_pGeneratedImage;
 	QPlainTextEdit* m_pteCodeEditor;
 	QLabel* m_lShadersOutput;
-
-	QSize m_scrollAreaSize;
 
 	UINT m_imageWidth;
 	UINT m_imageHeight;
 	UINT m_imageFormatID;
 
 private:
-	void FitImage();
 	void GenerateImage();
 
 private slots:
 	void SlotGenerateImage();
 	void SlotImageSettingsChange();
-	void SlotScaleChanged();
+	void SlotFitView();
 
 public:
 	CMainWindow();

@@ -22,17 +22,6 @@ char const* vsShader =
 "	return result;"
 "}";
 
-char const* psShader =
-"struct PSInput"
-"{"
-"	float4 position : SV_POSITION;"
-"	float2 uv : TEXCOORD;"
-"};"
-"float4 psMain(PSInput input) : SV_TARGET"
-"{"
-"	return float4(0.f, 0.f, 1.f, 1.f);"
-"}";
-
 D3D12_HEAP_PROPERTIES const GRenderTargetHeapProp =
 {
 	D3D12_HEAP_TYPE_CUSTOM,
@@ -72,6 +61,10 @@ void CRender::Init()
 	CheckResult(D3D12GetDebugInterface(IID_PPV_ARGS(&m_debugController)));
 	m_debugController->EnableDebugLayer();
 #endif
+
+	m_psBlob = nullptr;
+	m_texturePSO = nullptr;
+	m_renderTargetRes = nullptr;
 
 	m_viewport.MaxDepth = 1.f;
 	m_viewport.MinDepth = 0.f;
@@ -117,19 +110,11 @@ void CRender::Init()
 		600,
 		1,
 		1,
-		DXGI_FORMAT_R8G8B8A8_UNORM,
+		DXGI_FORMAT_UNKNOWN,
 		{ 1, 0 },
 		D3D12_TEXTURE_LAYOUT_UNKNOWN,
 		D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET
 	};
-
-	CheckResult(m_device->CreateCommittedResource(&GRenderTargetHeapProp, D3D12_HEAP_FLAG_NONE, &m_renderTargetDesc, D3D12_RESOURCE_STATE_RENDER_TARGET | D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_renderTargetRes)));
-	m_device->CreateRenderTargetView(m_renderTargetRes, nullptr, m_renderTargetHeap->GetCPUDescriptorHandleForHeapStart());
-
-	
-	m_device->GetCopyableFootprints(&m_renderTargetDesc, 0, 1, 0, &m_textureMetadata.m_textureFootprint, &m_textureMetadata.m_numRows, &m_textureMetadata.m_rowSize, &m_textureMetadata.m_textureSize);
-
-	m_renderTargetData = new BYTE[m_textureMetadata.m_textureSize];
 
 	ID3DBlob* rootSignatureBlob = nullptr;
 	ID3DBlob* errorBlob = nullptr;
@@ -138,14 +123,11 @@ void CRender::Init()
 	CheckResult(m_device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(), rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
 
 	CheckResult( D3DCompile(vsShader, strlen(vsShader), NULL, nullptr, nullptr, "vsFullScreen", "vs_5_0", 0, 0, &m_vsBlob, &errorBlob), errorBlob );
-	CheckResult( D3DCompile(psShader, strlen(psShader), NULL, nullptr, nullptr, "psMain", "ps_5_0", 0, 0, &m_psBlob, &errorBlob), errorBlob );
 
 	m_texturePsoDesc = {};
 	m_texturePsoDesc.pRootSignature = m_rootSignature;
 	m_texturePsoDesc.VS.BytecodeLength = m_vsBlob->GetBufferSize();
 	m_texturePsoDesc.VS.pShaderBytecode = m_vsBlob->GetBufferPointer();
-	m_texturePsoDesc.PS.BytecodeLength = m_psBlob->GetBufferSize();
-	m_texturePsoDesc.PS.pShaderBytecode = m_psBlob->GetBufferPointer();
 	
 	m_texturePsoDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 	m_texturePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
@@ -155,8 +137,6 @@ void CRender::Init()
 	m_texturePsoDesc.NumRenderTargets = 1;
 	m_texturePsoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 	m_texturePsoDesc.SampleDesc.Count = 1;
-
-	CheckResult(m_device->CreateGraphicsPipelineState(&m_texturePsoDesc, IID_PPV_ARGS(&m_texturePSO)));
 
 	rootSignatureBlob->Release();
 	if ( errorBlob )
@@ -193,13 +173,19 @@ bool CRender::ChangePixelShader(char const* psCode, QString& output)
 
 	if (retValue)
 	{
-		m_psBlob->Release();
+		if (m_psBlob)
+		{
+			m_psBlob->Release();
+		}
 		m_psBlob = psShaderBlob;
 
 		m_texturePsoDesc.PS.BytecodeLength = m_psBlob->GetBufferSize();
 		m_texturePsoDesc.PS.pShaderBytecode = m_psBlob->GetBufferPointer();
 
-		m_texturePSO->Release();
+		if (m_texturePSO)
+		{
+			m_texturePSO->Release();
+		}
 		CheckResult(m_device->CreateGraphicsPipelineState(&m_texturePsoDesc, IID_PPV_ARGS(&m_texturePSO)));
 	}
 
@@ -232,7 +218,7 @@ void CRender::GenerateImage()
 
 void* CRender::GetRenderTargetData() const
 {
-	CheckResult(m_renderTargetRes->ReadFromSubresource((void*)m_renderTargetData, m_textureMetadata.m_textureFootprint.Footprint.RowPitch, m_textureMetadata.m_textureSize, 0, nullptr));
+	CheckResult(m_renderTargetRes->ReadFromSubresource((void*)m_renderTargetData, m_textureMetadata.m_rowPitch, m_textureSize, 0, nullptr));
 	return m_renderTargetData;
 }
 
@@ -254,16 +240,22 @@ bool CRender::ChangeImageSettings(UINT const width, UINT const height, DXGI_FORM
 		m_renderTargetDesc.Format = dxgiFormat;
 	}
 
-	m_renderTargetRes->Release();
+	if (m_renderTargetRes)
+	{
+		m_renderTargetRes->Release();
+	}
 	m_renderTargetDesc.Width = width;
 	m_renderTargetDesc.Height = height;
 
 	CheckResult(m_device->CreateCommittedResource(&GRenderTargetHeapProp, D3D12_HEAP_FLAG_NONE, &m_renderTargetDesc, D3D12_RESOURCE_STATE_RENDER_TARGET | D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_renderTargetRes)));
 	m_device->CreateRenderTargetView(m_renderTargetRes, nullptr, m_renderTargetHeap->GetCPUDescriptorHandleForHeapStart());
 
-	m_device->GetCopyableFootprints(&m_renderTargetDesc, 0, 1, 0, &m_textureMetadata.m_textureFootprint, &m_textureMetadata.m_numRows, &m_textureMetadata.m_rowSize, &m_textureMetadata.m_textureSize);
+	D3D12_PLACED_SUBRESOURCE_FOOTPRINT textureFootprint;
+
+	m_device->GetCopyableFootprints(&m_renderTargetDesc, 0, 1, 0, &textureFootprint, &m_textureMetadata.m_numRows, &m_textureMetadata.m_rowSize, &m_textureSize);
 	delete[] m_renderTargetData;
-	m_renderTargetData = new BYTE[m_textureMetadata.m_textureSize];
+	m_renderTargetData = new BYTE[m_textureSize];
+	m_textureMetadata.m_rowPitch = textureFootprint.Footprint.RowPitch;
 
 	m_viewport.Width = (float)width;
 	m_viewport.Height = (float)height;
