@@ -5,6 +5,7 @@
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QSplitter>
 #include <QtWidgets/QDockWidget>
+#include <QtWidgets/QShortcut>
 
 float const GCheckerboardScale = 50.f;
 uchar const GCheckerboardData[] =
@@ -70,8 +71,10 @@ CMainWindow::CMainWindow()
 {
 	QMainWindow::setWindowTitle("Texture Generator");
 
-	QPushButton* btnGenerate = new QPushButton("Reload shader");
+	QPushButton* btnGenerate = new QPushButton("Compile(F5)");
 	connect(btnGenerate, SIGNAL(clicked()), this, SLOT(SlotGenerateImage()));
+	QShortcut* compileShortcut = new QShortcut(QKeySequence( "F5" ), this);
+	connect(compileShortcut, SIGNAL(activated()), this, SLOT(SlotGenerateImage()));
 
 	m_pteCodeEditor = new QPlainTextEdit();
 
@@ -94,10 +97,12 @@ CMainWindow::CMainWindow()
 
 	m_leImageWidth = new QLineEdit(QString::number(m_imageWidth));
 	m_leImageHeight = new QLineEdit(QString::number(m_imageHeight));
+	connect(m_leImageWidth, SIGNAL(returnPressed()), this, SLOT(SlotImageSettingsChange()));
+	connect(m_leImageHeight, SIGNAL(returnPressed()), this, SLOT(SlotImageSettingsChange()));
+	QPushButton* fitInView = new QPushButton("FitIn&View");
+	connect(fitInView, SIGNAL(clicked()), this, SLOT(SlotFitView()));
 	QPushButton* applyImageSize = new QPushButton("Apply");
 	connect(applyImageSize, SIGNAL(clicked()), this, SLOT(SlotImageSettingsChange()));
-	QPushButton* fitInView = new QPushButton("FitInView");
-	connect(fitInView, SIGNAL(clicked()), this, SLOT(SlotFitView()));
 
 	QStringList formatsNames;
 	formatsNames.append("R8G8B8A8");
@@ -115,6 +120,7 @@ CMainWindow::CMainWindow()
 	imageSizeLayout->addWidget(m_cbFormats);
 	imageSizeLayout->addWidget(fitInView);
 	imageSizeLayout->addWidget(applyImageSize);
+	imageSizeLayout->addWidget(new QWidget(), 1);
 
 	QImage checkerboardImg((uchar*)GCheckerboardData, 2, 2, QImage::Format_Grayscale8);
 	m_gsImageScene = new QGraphicsScene();
